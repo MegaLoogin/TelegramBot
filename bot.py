@@ -34,6 +34,7 @@ def hideKeyboard(user):
 	sendMethod("sendMessage", f"chat_id={user['id']}&text=Keyboard hided!&reply_markup={json.dumps(hide_keyboard)}")
 
 def sendPage(id, page):
+	print(page)
 	sendMessage(id, f"Page: {page}")
 	sendMessage(id, getPageText(page))
 
