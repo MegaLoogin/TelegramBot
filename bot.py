@@ -1,10 +1,62 @@
 import requests
 import time
 import math
+import json
 from bs4 import BeautifulSoup
 
 TOKEN = "546951764:AAHrXPtQpeYQBQLs3VX9NHau_j3Sz28q4Qw"
 URL = f"https://telegg.ru/orig/bot{TOKEN}"
+
+messages = [{'update_id': 0}]
+
+users = {}
+
+keyboard = {
+	'keyboard': [[{'text': 'Back'}, {'text': 'Next'}]],
+	'resize_keyboard': True
+}
+
+hide_keyboard = {
+	'hide_keyboard': True
+}
+
+def getPageText(page):
+	text = requests.get(f"https://knijky.ru/books/ya-poslannik?page={page}").text
+	bs = BeautifulSoup(text)
+	return bs.find("table").text
+
+def showKeyboard(user):
+	user['params']['keyboard'] = True
+	sendMethod("sendMessage", f"chat_id={user['id']}&text=Keyboard showed!&reply_markup={json.dumps(keyboard)}")
+
+def hideKeyboard(user):
+	user['params']['keyboard'] = False
+	sendMethod("sendMessage", f"chat_id={user['id']}&text=Keyboard hided!&reply_markup={json.dumps(hide_keyboard)}")
+
+def sendPage(id, page):
+	sendMessage(id, f"Page: {page}")
+	sendMessage(id, getPageText(page))
+
+def nxt(user):
+	user['params']['page'] += 1
+	sendPage(user['id'], user['params']['page'])
+
+def back(user):
+	if(user['params']['page'] > 1): user['params']['page'] -= 1
+	sendPage(user['id'], user['params']['page'])
+
+def setPage(arg, user):
+	user['params']['page'] = int(arg)
+	sendPage(user['id'], user['params']['page'])
+
+
+commands = {
+	'next': nxt,
+	'back': back,
+	'/show': showKeyboard,
+	'/hide': hideKeyboard,
+	'/page': setPage
+}
 
 def getResponse(suburl):
 	return requests.get(URL + f"/{suburl}").json()
@@ -12,53 +64,40 @@ def getResponse(suburl):
 def sendMethod(method, params):
 	return getResponse(f"/{method}?{params}")['result']
 
-def lastMessage():
-	mess = sendMethod("getUpdates", "")
-	mes = mess[-1]
-	#for mes in mess:
-	if('message' in mes):
-		return (f"{mes['message']['from']['id']}, {mes['message']['from']['first_name']}, {mes['message']['text']}, {time.ctime(mes['message']['date'])}")
-	else:
-		return (f"{mes['edited_message']['from']['id']}, {mes['edited_message']['from']['first_name']}, {mes['edited_message']['text']}, {time.ctime(mes['edited_message']['date'])} '<edited>'")
+def sendMessage(chat_id, text, params = ""):
+	requests.post(f"{URL}/sendMessage", data={'chat_id': chat_id, 'text': text})
 
-def main():
+def getUpdates():
+	messages = [{'update_id': 0}]
 	while True:
-		commands = input().split(" ")
-		if(commands[0] == "exit"): 
-			print("Exiting...")
-			break
-		sendMethod(commands[0], commands[1] if (len(commands) > 1) else "")
+		messages = sendMethod("getUpdates", f"offset={messages[-1]['update_id'] + 1 if(len(messages) > 0) else 1000}")
+		parse(messages)
+		handleLastMessages()
 
-def sendMessage(id, text):
-	sendMethod("sendMessage", "chat_id={id}&text{text}")
+def handleLastMessages():
+	for user in users:
+		updates = users[user]['updates']
+		last_id = list(updates.keys())[-1]
+		last_message = updates[last_id]
 
-#lastMessage()
+		if(not last_message['handled']):
+			print(users[user]['updates'][last_id], user)
+			if(last_message['text'].lower().split(' ')[0] in commands):
+				if(len(last_message['text'].lower().split(' ')) > 1):
+					commands[last_message['text'].lower().split(' ')[0]](last_message['text'].lower().split(' ')[1], users[user])
+				else:
+					commands[last_message['text'].lower()](users[user])
 
-def mainx():
-	last = lastMessage()
-	while True:
-		mes = lastMessage()
-		if(last != mes): 
-			last = mes
-			print(mes)
-#headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11','Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8','Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3','Accept-Encoding': 'none','Accept-Language': 'en-US,en;q=0.8','Connection': 'keep-alive'}
-#r = requests.post("https://charts.forexpf.ru/html/htmlquotes/q", data=)
-#rx = requests.get(f"https://charts.forexpf.ru/html/htmlquotes/q?msg=1;SID={r};T={math.floor(time.time()*1000)}").text
-#bs = BeautifulSoup(r).text#.find('td', attrs = {'id':"b_29"}).text
-#print(r)
+				users[user]['updates'][last_id]['handled'] = True
 
-#import sseclient
-'''
+def parse(messages):
+	for mes in messages:
+		if('message' in mes):
+			user_id = mes['message']['from']['id']
+			text = mes['message']['text']
+			update_id = mes['update_id']
 
-url = f"https://charts.forexpf.ru/html/htmlquotes/qsse?msg=1;SID={sid};T={math.floor(time.time()*1000)}"
-print(url)'''
-#r = requests.get(f"https://charts.forexpf.ru/html/htmlquotes/qsse?msg=1;SID={sid};T={math.floor(time.time()*1000)}", stream=True)
-'''print(r.status_code)
-mess = sseclient.SSEClient(r).events()
-print(len(list(mess)))
-for i in mess:
-	print(i)'''
-sid = requests.get("https://charts.forexpf.ru/html/htmlquotes/q")
+			if(not user_id in users): users[user_id] = {'id': user_id, 'updates': {}, 'params': {'page': 1, 'keyboard': False}}
+			if(not update_id in users[user_id]['updates']): users[user_id]['updates'][update_id] = {'id': update_id, 'text': text, 'handled': False}
 
-r = requests.Request("POST", "https://charts.forexpf.ru/html/htmlquotes/q", params=f"1;SID={sid.text};B=;A=;NCH=;NCHP=;S=29;S=30")
-print(r.prepare())#r = requests.post("https://charts.forexpf.ru/html/htmlquotes/q", params=f"1;SID={sid.text};B=;A=;NCH=;NCHP=;S=29;S=30")
+getUpdates()
