@@ -7,7 +7,7 @@ verify_ssl = true
 
 [packages]
 redis = "*"
-requests = "==2.16.5"
+requests = "==2.20.0"
 beautifulsoup4 = "*"
 
 [requires]
