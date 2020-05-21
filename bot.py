@@ -22,6 +22,7 @@ hide_keyboard = {
 
 def getPageText(page):
 	text = requests.get(f"https://knijky.ru/books/ya-poslannik?page={page}").text
+	print(text)
 	bs = BeautifulSoup(text)
 	return bs.find("table").text
 
@@ -34,10 +35,8 @@ def hideKeyboard(user):
 	sendMethod("sendMessage", f"chat_id={user['id']}&text=Keyboard hided!&reply_markup={json.dumps(hide_keyboard)}")
 
 def sendPage(id, page):
-	text = getPageText(page)
-	print(text)
 	sendMessage(id, f"Page: {page}")
-	sendMessage(id, text)
+	sendMessage(id, getPageText(text))
 
 def nxt(user):
 	user['params']['page'] += 1
