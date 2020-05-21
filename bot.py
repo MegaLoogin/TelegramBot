@@ -35,7 +35,7 @@ def hideKeyboard(user):
 
 def sendPage(id, page):
 	text = getPageText(page)
-	print(page)
+	print(text)
 	sendMessage(id, f"Page: {page}")
 	sendMessage(id, text)
 
